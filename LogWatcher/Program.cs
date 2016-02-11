@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Composition;
+using System.ComponentModel.Composition.Hosting;
 using System.IO;
 using System.Linq;
-using System.Runtime.Remoting.Channels;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
+using LogWatcher.Printer;
 
 namespace LogWatcher
 {
@@ -15,11 +15,41 @@ namespace LogWatcher
 
         static void Main(string[] args)
         {
+            string printerName = "Default";
+
             var dir = args[0];
             var filter = args[1];
-            
-            var filePositions = new Dictionary<string, long>();
+            if (args.Length > 2)
+            {
+                printerName = args[2];
+            }
 
+            var programm = new Program();
+            programm.Run(dir, filter, printerName);
+
+        }
+
+        [ImportMany(typeof(ILogLinePrinter))]
+        private IEnumerable<Lazy<ILogLinePrinter>> LogLinePrinters { get; set; }
+
+        [ImportMany(typeof(INewFilePrinter))]
+        private IEnumerable<Lazy<INewFilePrinter>> NewFilePrinters { get; set; }
+
+        private ILogLinePrinter linePrinter;
+        private INewFilePrinter newFilePrinter;
+
+        private void Run(string dir, string filter, string printerName = "Default")
+        {
+            var catalog = new AggregateCatalog();
+            //Adds all the parts found in the same assembly as the Program class
+            catalog.Catalogs.Add(new AssemblyCatalog(typeof(Program).Assembly));
+            var container = new CompositionContainer(catalog);
+            container.ComposeParts(this);
+
+            linePrinter = LogLinePrinters.First(p => string.Equals(p.Value.Name, printerName, StringComparison.InvariantCultureIgnoreCase)).Value;
+            newFilePrinter = NewFilePrinters.First(p => string.Equals(p.Value.Name, printerName, StringComparison.InvariantCultureIgnoreCase)).Value;
+
+            var filePositions = new Dictionary<string, long>();
 
             //var watcher = new FileSystemWatcher();
             //watcher.Path = dir;
@@ -64,7 +94,7 @@ namespace LogWatcher
                     while (string.Equals(currentFile = FindLastChangedFile(dir, filter), lastFile))
                     {
                         Thread.Sleep(100);
-                        
+
                         //if the file size has not changed, idle
                         if (reader.BaseStream.Length == currentFilePosition)
                         {
@@ -110,24 +140,24 @@ namespace LogWatcher
             return lastChangedFile.FullName;
         }
 
-        static bool printedLogLine = false;
-
-        private static void PrintNewFile(string fileName)
+        private void PrintNewFile(string fileName)
         {
-            if (printedLogLine)
-            {
-                Console.WriteLine();
-                Console.WriteLine();
-                printedLogLine = false;
-            }
+            newFilePrinter.PrintNewFile(fileName);
+            //if (printedLogLine)
+            //{
+            //    Console.WriteLine();
+            //    Console.WriteLine();
+            //    printedLogLine = false;
+            //}
 
-            Console.WriteLine("Reading File " + fileName);
+            //Console.WriteLine("Reading File " + fileName);
         }
 
-        private static void PrintNewLogLine(string logLine)
+        private void PrintNewLogLine(string logLine)
         {
-            printedLogLine = true;
-            Console.WriteLine(logLine);
+            linePrinter.PrintLogLine(logLine);
+            //printedLogLine = true;
+            //Console.WriteLine(logLine);
         }
     }
 }
