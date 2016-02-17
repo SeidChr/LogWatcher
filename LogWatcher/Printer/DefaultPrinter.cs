@@ -1,31 +1,30 @@
 ﻿using System;
 using System.ComponentModel.Composition;
+using LogWatcher.Interface;
 
 namespace LogWatcher.Printer
 {
     [Export(typeof(ILogLinePrinter))]
-    [Export(typeof(INewFilePrinter))]
-    class DefaultPrinter : ILogLinePrinter, INewFilePrinter
+    class DefaultPrinter : ILogLinePrinter
     {
         public virtual string Name => "Default";
 
-        protected bool printedLogLine;
+        protected string lastFile = null;
 
         public virtual void PrintNewFile(string fileName)
         {
-            if (printedLogLine)
+            if (!string.Equals(lastFile, fileName, StringComparison.InvariantCultureIgnoreCase))
             {
                 Console.WriteLine();
                 Console.WriteLine();
-                printedLogLine = false;
+                Console.WriteLine("Printing changes in File: " + fileName);
+                lastFile = fileName;
             }
-
-            Console.WriteLine("Printing changes in File: " + fileName);
         }
 
-        public virtual void PrintLogLine(string logLine)
+        public virtual void PrintLogLine(string fileName, string logLine)
         {
-            printedLogLine = true;
+            PrintNewFile(fileName);
             Console.WriteLine(logLine);
         }
     }

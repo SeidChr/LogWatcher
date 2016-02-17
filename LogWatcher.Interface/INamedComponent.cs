@@ -1,4 +1,4 @@
-﻿namespace LogWatcher
+﻿namespace LogWatcher.Interface
 {
     public interface INamedComponent
     {

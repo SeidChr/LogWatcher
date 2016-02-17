@@ -1,21 +1,27 @@
 ﻿using System;
 using System.ComponentModel.Composition;
+using System.Text.RegularExpressions;
+using LogWatcher.Interface;
 
 namespace LogWatcher.Printer
 {
     [Export(typeof(ILogLinePrinter))]
-    [Export(typeof(INewFilePrinter))]
     class ColorPrinter : DefaultPrinter
     {
         public override string Name { get; } = "Color";
 
-        public override void PrintLogLine(string logLine)
+        private ConsoleColor lastServerityColor = Console.ForegroundColor;
+
+        public override void PrintLogLine(string fileName, string logLine)
         {
+            PrintNewFile(fileName);
+
             var oldColor = Console.ForegroundColor;
-            switch (GetLogSeverity(logLine, 2).ToLowerInvariant())
+            switch (GetLogSeverity(logLine).ToLowerInvariant())
             {
                 case "error":
                     Console.ForegroundColor = ConsoleColor.Red;
+                    
                     break;
                 case "warn":
                     Console.ForegroundColor = ConsoleColor.Yellow;
@@ -23,21 +29,34 @@ namespace LogWatcher.Printer
                 case "info":
                     Console.ForegroundColor = ConsoleColor.Green;
                     break;
+                default:
+                    Console.ForegroundColor = lastServerityColor;
+                    break;
             }
 
-            printedLogLine = true;
+            lastServerityColor = Console.ForegroundColor;
+
             Console.WriteLine(logLine);
 
             Console.ForegroundColor = oldColor;
         }
 
-        private string GetLogSeverity(string logLine, int index)
+        private string GetLogSeverity(string logLine)
         {
             var result = "";
-            var lineSplit = logLine.Split(new []{ ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (lineSplit.Length >= index+1)
+            var loweredLogLine = logLine.ToLowerInvariant();
+
+            if (Regex.IsMatch(loweredLogLine, "\\serror\\s"))
             {
-                result = lineSplit[index];
+                result = "error";
+            }
+            else if (Regex.IsMatch(loweredLogLine, "\\swarn\\s"))
+            {
+                result = "warn";
+            }
+            else if (Regex.IsMatch(loweredLogLine, "\\sinfo\\s"))
+            {
+                result = "info";
             }
 
             return result;

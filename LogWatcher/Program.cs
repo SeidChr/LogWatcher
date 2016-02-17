@@ -5,6 +5,7 @@ using System.ComponentModel.Composition.Hosting;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using LogWatcher.Interface;
 using LogWatcher.Printer;
 
 namespace LogWatcher
@@ -15,6 +16,12 @@ namespace LogWatcher
 
         static void Main(string[] args)
         {
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Parameters: \"<dir>\" \"<filter>\" [<printer>=\"Default\"]");
+                return;
+            }
+
             string printerName = "Default";
 
             var dir = args[0];
@@ -32,11 +39,7 @@ namespace LogWatcher
         [ImportMany(typeof(ILogLinePrinter))]
         private IEnumerable<Lazy<ILogLinePrinter>> LogLinePrinters { get; set; }
 
-        [ImportMany(typeof(INewFilePrinter))]
-        private IEnumerable<Lazy<INewFilePrinter>> NewFilePrinters { get; set; }
-
         private ILogLinePrinter linePrinter;
-        private INewFilePrinter newFilePrinter;
 
         private void Run(string dir, string filter, string printerName = "Default")
         {
@@ -47,7 +50,6 @@ namespace LogWatcher
             container.ComposeParts(this);
 
             linePrinter = LogLinePrinters.First(p => string.Equals(p.Value.Name, printerName, StringComparison.InvariantCultureIgnoreCase)).Value;
-            newFilePrinter = NewFilePrinters.First(p => string.Equals(p.Value.Name, printerName, StringComparison.InvariantCultureIgnoreCase)).Value;
 
             var filePositions = new Dictionary<string, long>();
 
@@ -70,7 +72,6 @@ namespace LogWatcher
                     continue;
                 }
 
-                PrintNewFile(currentFile);
                 using (StreamReader reader = new StreamReader(
                     new FileStream(
                         currentFile,
@@ -108,7 +109,7 @@ namespace LogWatcher
                         var line = "";
                         while ((line = reader.ReadLine()) != null)
                         {
-                            PrintNewLogLine(line);
+                            PrintNewLogLine(currentFile, line);
                         }
 
                         //update the last max offset and lastFile
@@ -139,23 +140,10 @@ namespace LogWatcher
 
             return lastChangedFile.FullName;
         }
-
-        private void PrintNewFile(string fileName)
+        
+        private void PrintNewLogLine(string fileName, string logLine)
         {
-            newFilePrinter.PrintNewFile(fileName);
-            //if (printedLogLine)
-            //{
-            //    Console.WriteLine();
-            //    Console.WriteLine();
-            //    printedLogLine = false;
-            //}
-
-            //Console.WriteLine("Reading File " + fileName);
-        }
-
-        private void PrintNewLogLine(string logLine)
-        {
-            linePrinter.PrintLogLine(logLine);
+            linePrinter.PrintLogLine(fileName, logLine);
             //printedLogLine = true;
             //Console.WriteLine(logLine);
         }
